@@ -8,9 +8,9 @@ class UserSystem(BaseSystem):
     def __init__(self) -> None:
         super().__init__()
 
-    def get_by_id(self, id: int) -> User:
+    def get_by_name(self, name: str) -> User:
         user = self._session.query(User) \
-                            .filter_by(id=id) \
+                            .filter_by(name=name) \
                             .first()
         
         if not user:

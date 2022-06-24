@@ -5,7 +5,7 @@ from sqlalchemy import (
     String,
     ForeignKey
 )
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
 
 
 class User(Base):
@@ -16,11 +16,14 @@ class User(Base):
 
     # relationship
     role_id = Column(Integer, ForeignKey('roles.id'))
-    role = relationship('Role', lazy='subquery', backref=backref('users', lazy=True))
+    role = relationship('Role', lazy='subquery')
 
     def __init__(self, name: str, password: str) -> None:
         self.name = name
         self.password = password
     
+    def __str__(self) -> str:
+        return f'<User {self.id} {self.name}>'
+
     def __repr__(self) -> str:
         return f'<User {self.id} {self.name}>'

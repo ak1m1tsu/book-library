@@ -44,6 +44,8 @@ def make_db():
 
         password = hashlib.sha256(b'admin').hexdigest()
         admin = User('admin', password)
+        admin.role = admin_role
+        admin.role_id = admin_role.id
 
         with Session(engine) as session:
             session.begin()
