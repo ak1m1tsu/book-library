@@ -6,9 +6,8 @@ from sqlalchemy import (
     ForeignKey,
     create_engine
 )
-from sqlalchemy.orm import relationship, backref, sessionmaker
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.ext.declarative import declarative_base
-import hashlib
 
 
 def make_db():
@@ -40,24 +39,26 @@ def make_db():
         def __repr__(self) -> str:
             return f'<Role {self.id} {self.name}>'
     
+    class Book(Base):
+        __tablename__ = 'books'
+        id = Column(Integer, autoincrement=True, primary_key=True)
+        name = Column(String(100), nullable=False)
+        author = Column(String(100), nullable=False)
+        pages = Column(Integer, nullable=False)
+
+        def __init__(self, name: str, author: str, pages: int) -> None:
+            self.name = name
+            self.author = author
+            self.pages = pages
+
+        def __repr__(self) -> str:
+            return f'<Book {self.id}>'
+
     if not os.path.exists('server.db'):
         with open('server.db', 'w'): pass
 
     try:
         Base.metadata.create_all(bind=engine)
-
-        admin_role = Role('admin')
-        user_role = Role('user')
-
-        password = hashlib.sha256(b'admin').hexdigest()
-        admin = User('admin', password)
-
-        session = sessionmaker(bind=engine)
-
-        session.add(admin_role)
-        session.add(user_role)
-        session.add(admin)
-        session.commit()
     except Exception:
         exit(0)
 

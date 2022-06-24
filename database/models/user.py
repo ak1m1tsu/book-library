@@ -21,3 +21,6 @@ class User(Base):
     def __init__(self, name: str, password: str) -> None:
         self.name = name
         self.password = password
+    
+    def __repr__(self) -> str:
+        return f'<User {self.id} {self.name}>'

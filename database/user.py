@@ -1,3 +1,5 @@
+from exceptions import NotFoundError, AlreadyExistsError
+
 from . import BaseSystem
 from .models.user import User
 
@@ -6,37 +8,28 @@ class UserSystem(BaseSystem):
     def __init__(self) -> None:
         super().__init__()
 
-    def get_by_id(self, id: int):
+    def get_by_id(self, id: int) -> User:
         user = self._session.query(User) \
                             .filter_by(id=id) \
                             .first()
         
         if not user:
-            raise ValueError(f"User #{id} doesn't exists.")
-        
-        return user
-
-    def get_by_name(self, name: str):
-        user = self._session.query(User) \
-                            .filter_by(name=name) \
-                            .first()
-        
-        if not user:
-            raise ValueError(f"User {name} doesn't exists.")
+            raise NotFoundError(user)
         
         return user
     
-    def create(self, name: str, password: str):
+    def create(self, name: str, password: str) -> int:
         user = self._session.query(User) \
                             .filter_by(name=name) \
                             .first()
         
         if user:
-            raise ValueError(f'User {name} already exists.')
+            raise AlreadyExistsError(user)
         
         with self._session as session:
             session.begin()
             try:
+                user = User(name, password)
                 session.add(user)
             except Exception:
                 session.rollback()
@@ -46,13 +39,13 @@ class UserSystem(BaseSystem):
         
         return 0
 
-    def delete(self, id: int):
+    def delete(self, id: int) -> int:
         user = self._session.query(User) \
                             .filter_by(id=id) \
                             .first()
         
         if not user:
-            raise ValueError(f"User #{id} doesn't exists.")
+            raise NotFoundError(user)
         
         with self._session as session:
             session.begin()
