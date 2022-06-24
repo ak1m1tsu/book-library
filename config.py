@@ -1,8 +1,6 @@
-from enum import Enum
-
-
 # server
 CONNECTION=("127.0.0.1", 8080)
+COMMAND_COUNT=7
 
 # logging
 LOG_PATH='./logs/error.log'
