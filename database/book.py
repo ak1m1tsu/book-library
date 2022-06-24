@@ -78,3 +78,5 @@ class BookSystem(BaseSystem):
                 session.commit()
         
         return 0
+
+book_system = BookSystem()
