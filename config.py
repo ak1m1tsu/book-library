@@ -5,7 +5,7 @@ from enum import Enum
 CONNECTION=("127.0.0.1", 8080)
 
 # logging
-LOG_PATH='/logs/error.log'
+LOG_PATH='./logs/error.log'
 LOG_FORMAT="{time} | {level} | {message}"
 LOG_LEVEL='ERROR'
 LOG_ROTATION='10 KB'

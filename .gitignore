@@ -218,4 +218,5 @@ pip-selfcheck.json
 # Ignore code-workspaces
 *.code-workspace
 
-# End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,venv,database,text
+# project
+/logs
