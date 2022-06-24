@@ -8,6 +8,15 @@ class BookSystem(BaseSystem):
     def __init__(self) -> None:
         super().__init__()
 
+    def get_all(self) -> list:
+        books = self._session.query(Book) \
+                             .all()
+        
+        if not books:
+            raise NotFoundError(books)
+
+        return books
+
     def get_by_id(self, id: int) -> Book:
         book = self._session.query(Book) \
                             .filter_by(id=id) \
