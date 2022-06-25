@@ -3,8 +3,6 @@ from sqlalchemy.ext.declarative import DeclarativeMeta
 
 import json
 
-from database.models.book import Book
-
 
 class Commands(Enum):
     GET_BOOK_LIST=0
@@ -14,6 +12,16 @@ class Commands(Enum):
     DELETE_BOOK=4
     DISCONNECT_FROM_SERVER=5
     TURN_OF_SERVER=6
+
+
+class ServerResponses(Enum):
+    GET_ALL='get_all'
+    ADD='add'
+    FIND_BY_NAME='find_by_name'
+    FIND_BY_AUTHOR='find_by_author'
+    DELETE='del'
+    DISCONNECT_USER='bye'
+    STOP_SERVER='stop'
 
 
 class AlchemyEncoder(json.JSONEncoder):
