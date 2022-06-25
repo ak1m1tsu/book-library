@@ -11,7 +11,7 @@ class BookSystem(BaseSystem):
     def get_all(self) -> list:
         books = self._session.query(Book) \
                              .all()
-        
+
         if not books:
             raise NotFoundError(books)
 
@@ -21,40 +21,40 @@ class BookSystem(BaseSystem):
         book = self._session.query(Book) \
                             .filter_by(id=id) \
                             .first()
-        
+
         if not book:
             raise NotFoundError(book)
-        
+
         return book
-    
+
     def find_by_name(self, name: str) -> list:
         books = self._session.query(Book) \
                              .filter(Book.name.ilike(name)) \
                              .all()
-        
+
         if not books:
             raise NotFoundError(books)
-        
+
         return books
-    
+
     def find_by_author(self, author: str) -> list:
         books = self._session.query(Book) \
                              .filter(Book.author.ilike(author)) \
                              .all()
-        
+
         if not books:
             raise NotFoundError(books)
-        
+
         return books
-    
+
     def create(self, name: str, author: str, pages: int = 1) -> int:
         book = self._session.query(Book) \
                             .filter_by(name=name, author=author, pages=pages) \
                             .first()
-        
+
         if book:
             raise AlreadyExistsError(book)
-        
+
         with self._session as session:
             session.begin()
             try:
@@ -65,17 +65,17 @@ class BookSystem(BaseSystem):
                 return -1
             else:
                 session.commit()
-        
+
         return 0
 
     def delete(self, id: int) -> int:
         book = self._session.query(Book) \
                             .filter_by(id=id) \
                             .first()
-        
+
         if not book:
             raise NotFoundError(book)
-        
+
         with self._session as session:
             session.begin()
             try:
@@ -85,7 +85,8 @@ class BookSystem(BaseSystem):
                 return -1
             else:
                 session.commit()
-        
+
         return 0
+
 
 book_system = BookSystem()

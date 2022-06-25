@@ -12,20 +12,20 @@ class UserSystem(BaseSystem):
         user = self._session.query(User) \
                             .filter_by(name=name) \
                             .first()
-        
+
         if not user:
             raise NotFoundError(user)
-        
+
         return user
-    
+
     def create(self, name: str, password: str) -> int:
         user = self._session.query(User) \
                             .filter_by(name=name) \
                             .first()
-        
+
         if user:
             raise AlreadyExistsError(user)
-        
+
         with self._session as session:
             session.begin()
             try:
@@ -36,17 +36,17 @@ class UserSystem(BaseSystem):
                 return -1
             else:
                 session.commit()
-        
+
         return 0
 
     def delete(self, id: int) -> int:
         user = self._session.query(User) \
                             .filter_by(id=id) \
                             .first()
-        
+
         if not user:
             raise NotFoundError(user)
-        
+
         with self._session as session:
             session.begin()
             try:
@@ -58,5 +58,6 @@ class UserSystem(BaseSystem):
                 session.commit()
 
         return 0
+
 
 user_system = UserSystem()
