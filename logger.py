@@ -17,3 +17,11 @@ logger.add(
     rotation=config.LOG_ROTATION,
     compression=config.LOG_COMPRESSION
 )
+
+logger.add(
+    sink=config.INFO_PATH,
+    format=config.LOG_FORMAT,
+    level=config.INFO,
+    rotation=config.LOG_ROTATION,
+    compression=config.LOG_COMPRESSION
+)
