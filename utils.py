@@ -1,12 +1,35 @@
 from enum import Enum
+from sqlalchemy.ext.declarative import DeclarativeMeta
+
+import json
+
+from database.models.book import Book
 
 
 class Commands(Enum):
     GET_BOOK_LIST=0
     ADD_BOOK=1
-    GET_BOOK_BY_ID=2
-    FIND_BOOK_BY_AUTHOR=3
-    FIND_BOOK_BY_NAME=4
-    DELETE_BOOK=5
-    DISCONNECT_FROM_SERVER=6
-    TURN_OF_SERVER=7
+    FIND_BOOK_BY_AUTHOR=2
+    FIND_BOOK_BY_NAME=3
+    DELETE_BOOK=4
+    DISCONNECT_FROM_SERVER=5
+    TURN_OF_SERVER=6
+
+
+class AlchemyEncoder(json.JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj.__class__, DeclarativeMeta):
+            # an SQLAlchemy class
+            fields = {}
+            for field in [x for x in dir(obj) if not x.startswith('_') and x != 'metadata']:
+                data = obj.__getattribute__(field)
+                try:
+                    json.dumps(data) # this will fail on non-encodable values, like other classes
+                    fields[field] = data
+                except TypeError:
+                    fields[field] = None
+            # a json-encodable dict
+            return fields
+
+        return json.JSONEncoder.default(self, obj)
