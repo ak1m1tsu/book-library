@@ -1,3 +1,9 @@
+import os
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 # server
 COMMAND_COUNT = 7
 BOOK_HEADERS = ['ID', 'Имя', 'Автор', 'Кол-во страниц']
@@ -12,3 +18,6 @@ DEBUG = 'DEBUG'
 INFO = 'INFO'
 LOG_ROTATION = '10 KB'
 LOG_COMPRESSION = 'zip'
+
+# database
+DATABASE_URL = os.getenv('DATABASE_URL')
