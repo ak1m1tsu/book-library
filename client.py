@@ -1,132 +1,267 @@
-import socket
+import asyncio
 import json
-from time import sleep
+import uuid
 
-from config import CONNECTION
+from typing import MutableMapping
+from hashlib import sha256
+from prettytable import PrettyTable
+
+from aio_pika import Message, connect
+from aio_pika.abc import (
+    AbstractChannel,
+    AbstractConnection,
+    AbstractIncomingMessage,
+    AbstractQueue
+)
+
+from config import COMMAND_COUNT, BOOK_HEADERS
+from exceptions import NotFoundError
+from database.models.user import User
+from database.user import user_system
+from logger import logger
 
 
-class Client(socket.socket):
-    def __init__(self, **kwargs) -> None:
-        super().__init__(socket.AF_INET, socket.SOCK_STREAM, **kwargs)
-        self.role = 'user'
+class RpcClient(object):
+    connection: AbstractConnection
+    channel: AbstractChannel
+    callback_queue: AbstractQueue
+    loop: asyncio.AbstractEventLoop
 
+    def __init__(self, user: User) -> None:
+        self.id : uuid.UUID = user.id
+        self.futures: MutableMapping[str, asyncio.Future] = {}
+        self.loop = asyncio.get_running_loop()
+        self.user = user
 
-def start_client():
+    async def connect(self) -> "RpcClient":
+        self.connection = await connect(
+            url="amqp://admin:admin@localhost/",
+            loop=self.loop,
+        )
 
-    client = Client()
-    client.connect(CONNECTION)
-    print ("Connected to server as User")
+        self.channel = await self.connection.channel()
+        self.callback_queue = await self.channel.declare_queue(
+            exclusive=True,
+            name=self.user.name
+        )
 
-    while True:
+        client_data = {
+            'id' : self.id.hex,
+            'command' : 'init_client'
+        }
         
-        print("Choose a command")
-        print("0 - Get a book list")
-        print("1 - Add book")
-        print("2 - Remove book")
-        print("3 - Exit")
-        print("4 - Выключить сервер")
+        await self.callback_queue.consume(self._on_response)
+        await self.channel.default_exchange.publish(
+            Message(
+                correlation_id=str(uuid.uuid4()),
+                content_type="application/json",
+                body=json.dumps(client_data).encode(),
+                reply_to=self.callback_queue
+            ),
+            routing_key="rpc_queue"
+        )
 
-        task = input()
+        return self
 
-        if not task.isdigit() or int(task) > 4:
-            print ("Wrong command!")
-            continue
+    def _on_response(self, message: AbstractIncomingMessage) -> None:
+        if message.correlation_id is None:
+            print(f" [e] Что-то пошло не так... {message!r}")
+            return
 
-        task=int(task)
+        future: asyncio.Future = self.futures.pop(message.correlation_id)
+        future.set_result(message.body)
 
-        msg = {}
+    async def call(self, data: str):
+        correlation_id = str(uuid.uuid4())
+        future = self.loop.create_future()
 
-        if task == 0:
-            msg["command"] = "read"
+        self.futures[correlation_id] = future
 
-        if task == 1:
-            msg["command"]= "add"
-            msg["object"] = create_book()
+        published = await self.channel.default_exchange.publish(
+            Message(
+                correlation_id=correlation_id,
+                body=data.encode(),
+                content_type="application/json",
+                reply_to=self.callback_queue
+            ),
+            routing_key="rpc_queue"
+        )
 
-        if task == 2:
-            msg["command"] = "del"
-            msg["object"] = get_id()
-
-        if task == 3:
-            msg["command"] = "bye"
-
-        if task == 4:
-            msg["command"] = "stop"
-
-        js_string=json.dumps(msg)
-        client.sendall(bytes(js_string, 'UTF-8'))
-
-        content={}
-
-        if task < 3:
-            in_data = client.recv(1024).decode()
-
-            try:
-                content=json.loads(in_data)
-            except Exception as error:
-                print("Something went wrong: ", error)
-                print("Client disconnected...")
-                client.close()
-                exit(0)
-
-        if task == 0:
-            if content:
-                print_books(content)
-            else:
-                print("The list is empty")
-
-        if task == 1:
-            print(content)
-
-        if task == 2:
-            print(content)
-
-        if task == 3:
-            print('Disconnect from server')
-            client.close()
-            exit(0)
-
-        if task == 4:
-            print('Server turns off')
-            sleep(1)
-            print('Disconnected from server')
-            sleep(1)
-            client.close()
-            exit(0)
+        return bytes(await future).decode(), published
 
 
-def print_books(books):
-    print ("="*15)
-    print('The book list')
-    print ("="*15)
-    for id in books.keys():
-        print ("%s - %s - %s - %s" % (id, books[id]["name"], books[id]["author"], books[id]["pages"]))
-    print ("="*15)
+async def main() -> None:
+    try:
+        logged_in = False
+
+        print(' [x] Нажмите ctrl+c чтобы выйти.')
+        # while not logged_in:
+        #     logged_in, user = try_logged_in()
+
+        client = await RpcClient(User('admin', 'admin')).connect()
+        print(f" [x] Поключился к серверу как {client.user.name}.")
+
+        while True:
+            render_user_commands()
+            is_command_select = False
+
+            while not is_command_select:
+                is_command_select, command = try_select_command()
+
+            message = {
+                'id' : client.id.hex
+            }
+
+            match command:
+                case 0:
+                    message['command'] = 'get_all'
+                case 1:
+                    message['command'] = 'add'
+                    message['object'] = create_book()
+                case 2:
+                    message['command'] = 'find_by_author'
+                    message['object'] = get_book_author()
+                case 3:
+                    message['command'] = 'find_by_name'
+                    message['object'] = get_book_name()
+                case 4:
+                    message['command'] = 'del'
+                    message['object'] = get_book_id()
+                case 5:
+                    message['command'] = 'bye'
+                case 6:
+                    message['command'] = 'stop'
+                case _:
+                    logger.error(f' [x] Неверная команда: {command!r}')
+                    continue
+
+            request = json.dumps(message)
+            response, published = await client.call(request)
+            
+            print('===', published.attributes())
+
+            response = json.loads(response)
+
+            match command:
+                case 0:
+                    render_book_list(response)
+                case 1:
+                    print(response['message'])
+                case 2:
+                    render_book_list(response)
+                case 3:
+                    render_book_list(response)
+                case 4:
+                    print(response['message'])
+                case 5:
+                    print(' [x] Отключение от сервера.')
+                    exit(0)
+                case 6:
+                    print(' [x] Сервер выключается.')
+                    print(' [x] Отключение от сервера.')
+                    exit(0)
+    except KeyboardInterrupt:
+        await client.callback_queue.delete()
+        exit(0)
+    except Exception as e:
+        logger.error(e)
+
+
+def render_user_commands():
+    print(" [•] Выберете команду:")
+    print(" [•] 0 - Показать список книг.")
+    print(" [•] 1 - Добавить книгу.")
+    print(" [•] 2 - Найти книгу по автору.")
+    print(" [•] 3 - Найти книгу по названию.")
+    print(" [•] 4 - Удалить книгу.")
+    print(" [•] 5 - Выйти.")
+    print(" [•] 6 - Выключить сервер.")
+
+
+def try_select_command():
+    command = input(' [•] Введите номер комманды: ')
+
+    if not command.isdigit() or not 0 <= int(command) <= COMMAND_COUNT:
+        print(' [x] Неизвестная команда!')
+        return False, None
+
+    return True, int(command)
+
+
+def try_logged_in():
+    name = input(' [•] Введите имя пользователя: ')
+    password = input(' [•] Введи пароль пользователя: ')
+
+    try:
+        user = user_system.get_by_name(name=name)
+    except NotFoundError as e:
+        print(' [e] Неверное имя пользователя.')
+        logger.error(e)
+        return False, None
+
+    if user.password != sha256(bytes(password, 'utf-8')).hexdigest():
+        print(' [e] Неверный пароль пользователя.')
+        return False, None
+
+    return True, user
+
+
+def render_book_list(books: list):
+    table = PrettyTable(BOOK_HEADERS)
+    for book in books:
+        table.add_row([
+            book['id'],
+            book['name'],
+            book['author'],
+            book['pages']
+        ])
+    print(table)
 
 
 def create_book():
-    book={}
-    print("Enter a book name:")
-    book['name']=input()
-
-    print("Enter a book author:")
-    book['author']=input()
-
-    print("Enter page count:")
-    book['pages']=input()
+    book = {}
+    book['name'] = input(" [•] Введите название книги: ")
+    book['author'] = input(" [•] Введите автора: ")
+    book['pages'] = input(" [•] Введите кол-во страниц: ")
 
     return book
 
 
-def get_id():
+def get_book_id():
     while True:
-        print("Enter book number:")
-        id = input()
+        id = input(" [•] Введите ID книги: ")
 
         if id.isdigit():
             return id
 
-        print ("Incorrect number")
+        print(" [e] Номер должен содержать только цифры!")
 
 
-start_client()
+def get_book_name():
+    return input(' [•] Введите название книги: ')
+
+
+def get_book_author():
+    return input(' [•] Введите автора книги: ')
+
+
+def run():
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        task = loop.create_task(main())
+        task.add_done_callback(
+            lambda t: print(' [x] Отключение...')
+        )
+    else:
+        asyncio.run(main())
+
+
+if __name__ == "__main__":
+    try:
+        run()
+    except KeyboardInterrupt:
+        exit(0)
