@@ -4,6 +4,7 @@ import uuid
 
 from typing import MutableMapping
 from hashlib import sha256
+from aiormq import ChannelLockedResource
 from prettytable import PrettyTable
 
 from aio_pika import Message, connect
@@ -33,11 +34,14 @@ class RpcClient(object):
         self.loop = asyncio.get_running_loop()
         self.user = user
 
-    async def connect(self) -> "RpcClient":
-        self.connection = await connect(
-            url="amqp://admin:admin@localhost/",
-            loop=self.loop,
-        )
+    async def connect(self) -> tuple["RpcClient", str]:
+        try:
+            self.connection = await connect(
+                url="amqp://admin:admin@localhost/",
+                loop=self.loop,
+            )
+        except Exception:
+            raise ValueError
 
         self.channel = await self.connection.channel()
         self.callback_queue = await self.channel.declare_queue(
@@ -45,23 +49,29 @@ class RpcClient(object):
             name=self.user.name
         )
 
-        client_data = {
+        correlation_id = str(uuid.uuid4())
+        future = self.loop.create_future()
+
+        self.futures[correlation_id] = future
+
+        request_data = {
             'id' : self.id.hex,
+            'object' : self.user.name,
             'command' : 'init_client'
         }
-        
+
         await self.callback_queue.consume(self._on_response)
         await self.channel.default_exchange.publish(
             Message(
-                correlation_id=str(uuid.uuid4()),
+                correlation_id=correlation_id,
                 content_type="application/json",
-                body=json.dumps(client_data).encode(),
+                body=json.dumps(request_data).encode(),
                 reply_to=self.callback_queue
             ),
             routing_key="rpc_queue"
         )
 
-        return self
+        return self, bytes(await future).decode()
 
     def _on_response(self, message: AbstractIncomingMessage) -> None:
         if message.correlation_id is None:
@@ -77,7 +87,7 @@ class RpcClient(object):
 
         self.futures[correlation_id] = future
 
-        published = await self.channel.default_exchange.publish(
+        await self.channel.default_exchange.publish(
             Message(
                 correlation_id=correlation_id,
                 body=data.encode(),
@@ -87,7 +97,7 @@ class RpcClient(object):
             routing_key="rpc_queue"
         )
 
-        return bytes(await future).decode(), published
+        return bytes(await future).decode()
 
 
 async def main() -> None:
@@ -95,13 +105,22 @@ async def main() -> None:
         logged_in = False
 
         print(' [x] Нажмите ctrl+c чтобы выйти.')
-        # while not logged_in:
-        #     logged_in, user = try_logged_in()
+        while not logged_in:
+            logged_in, user = try_logged_in()
 
-        client = await RpcClient(User('admin', 'admin')).connect()
-        print(f" [x] Поключился к серверу как {client.user.name}.")
+        try:
+            client, connection_response = await RpcClient(user).connect()
+        except ValueError:
+            print(' [x] Пользователь уже имеет активную сессию.')
+            return
 
-        while True:
+        connection_response = json.loads(connection_response)
+        print(f' [x] {connection_response["message"]}')
+
+        if not connection_response['success']:
+            return
+
+        while connection_response['success']:
             render_user_commands()
             is_command_select = False
 
@@ -129,6 +148,7 @@ async def main() -> None:
                     message['object'] = get_book_id()
                 case 5:
                     message['command'] = 'bye'
+                    message['object'] = client.user.name
                 case 6:
                     message['command'] = 'stop'
                 case _:
@@ -136,35 +156,28 @@ async def main() -> None:
                     continue
 
             request = json.dumps(message)
-            response, published = await client.call(request)
-            
-            print('===', published.attributes())
+            response = await client.call(request)
 
             response = json.loads(response)
 
-            match command:
-                case 0:
-                    render_book_list(response)
-                case 1:
-                    print(response['message'])
-                case 2:
-                    render_book_list(response)
-                case 3:
-                    render_book_list(response)
-                case 4:
-                    print(response['message'])
-                case 5:
+            match response['command']:
+                case 'render_books':
+                    render_book_list(response['message'])
+                case 'added':
+                    print(f' [x] {response["message"]}')
+                case 'deleted':
+                    print(f' [x] {response["message"]}')
+                case 'disconnect':
                     print(' [x] Отключение от сервера.')
                     exit(0)
-                case 6:
+                case 'close':
                     print(' [x] Сервер выключается.')
                     print(' [x] Отключение от сервера.')
                     exit(0)
+                case 'error':
+                    print(f' [x] {response["message"]}')
     except KeyboardInterrupt:
         await client.callback_queue.delete()
-        exit(0)
-    except Exception as e:
-        logger.error(e)
 
 
 def render_user_commands():
@@ -261,7 +274,4 @@ def run():
 
 
 if __name__ == "__main__":
-    try:
-        run()
-    except KeyboardInterrupt:
-        exit(0)
+    run()
