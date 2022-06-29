@@ -1,5 +1,6 @@
 import asyncio
 import json
+import fcntl, sys, os
 
 from uuid import UUID
 
@@ -250,8 +251,13 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    fp = open(os.path.realpath(__file__), 'r')
     try:
+        fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
         asyncio.run(main())
+    except IOError:
+        print(' [x] Сервер уже запущен.')
+        sys.exit(0)
     except Exception as e:
         logger.error(e)
         
