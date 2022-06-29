@@ -11,3 +11,8 @@ class NotFoundError(Error):
 class AlreadyExistsError(Error):
     '''Raised when the object already exists in database'''
     pass
+
+
+class ClientExists(Error):
+    '''Raised when rpc client alrady exists in server client list'''
+    pass

@@ -1,5 +1,4 @@
 # server
-CONNECTION = ("127.0.0.1", 8080)
 COMMAND_COUNT = 7
 BOOK_HEADERS = ['ID', 'Имя', 'Автор', 'Кол-во страниц']
 

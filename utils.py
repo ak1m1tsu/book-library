@@ -1,27 +1,6 @@
-from enum import Enum
-from sqlalchemy.ext.declarative import DeclarativeMeta
-
 import json
 
-
-class ClientCommands(Enum):
-    GET_BOOK_LIST = 0
-    ADD_BOOK = 1
-    FIND_BOOK_BY_AUTHOR = 2
-    FIND_BOOK_BY_NAME = 3
-    DELETE_BOOK = 4
-    DISCONNECT_FROM_SERVER = 5
-    TURN_OF_SERVER = 6
-
-
-class ServerResponses(Enum):
-    GET_ALL = 'get_all'
-    ADD = 'add'
-    FIND_BY_NAME = 'find_by_name'
-    FIND_BY_AUTHOR = 'find_by_author'
-    DELETE = 'del'
-    DISCONNECT_USER = 'bye'
-    STOP_SERVER = 'stop'
+from sqlalchemy.ext.declarative import DeclarativeMeta
 
 
 class AlchemyEncoder(json.JSONEncoder):
