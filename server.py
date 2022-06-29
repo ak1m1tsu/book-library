@@ -1,125 +1,59 @@
-import json
-import socket
+import asyncio
 
-from config import CONNECTION
+from aio_pika import Connection, Message
+from aio_pika.abc import (
+    AbstractChannel,
+    AbstractConnection,
+    AbstractIncomingMessage,
+    AbstractQueue,
+    AbstractExchange
+)
 
-
-class Server(socket.socket):
-    def __init__(self, **kwargs) -> None:
-        super().__init__(socket.AF_INET, socket.SOCK_STREAM, **kwargs)
-
-
-def start_server():
-
-    server = Server()
-
-    try:
-        server.bind(CONNECTION)
-        server.listen(1)
-        print("Server started")
-    except:
-        print('Server already started')
-        server.close()
-        exit(0)
-
-    while True:
-
-        print("Waiting for connection...")
-        (clientConnection, clientAddress) = server.accept()
-        print("The client connected:", clientAddress)
-        msg = ''
-
-        while True:
-
-            in_data = clientConnection.recv(1024)
-            msg = in_data.decode()
-            data = json.loads(msg)
-
-            answer = None
-
-            if data["command"] == 'bye':
-                print("The client disconnected....")
-                clientConnection.close()
-                break
-
-            if data["command"] == 'stop':
-                print("Server turns off")
-                clientConnection.close()
-                server.close()
-                exit(0)
-
-            if data["command"] == 'add':
-                print("Adds a book")
-                answer = add_book(data["object"])
-
-            if data["command"] == 'del':
-                print("Removes a book")
-                answer = del_book(data["object"])
-
-            if data["command"] == 'read':
-                print("Reads a book list")
-                answer = read_books()
-
-            clientConnection.send(bytes(json.dumps(answer), 'UTF-8'))
+from logger import logger
 
 
+class RpcServer(object):
+    connection: AbstractConnection
+    channel: AbstractChannel
+    queue: AbstractQueue
+    exchange: AbstractExchange
+    loop: asyncio.AbstractEventLoop
 
-def del_book(id):
-    content = read_books()
+    def __init__(self):
+        self.loop = asyncio.get_running_loop()
 
-    if id in content:
-        del content[id]
-        save_books(content)
-        return "Book was removed"
-    
-    return "Book doesn't exists"
+    async def _connect(self) -> None:
+        self.connection = Connection(
+            "amqp://server:test@localhost/",
+            loop=self.loop
+        )
+        self.connection.connect()
+        self.channel = await self.connection.channel()
+        self.exchange = self.channel.default_exchange
+        self.queue = await self.channel.declare_queue('rpc_queue')
 
+    async def _get_response(content: str):
+        pass
 
-def add_book(book):
-    msg=check_book(book)
+    async def run_until_complete(self):
+        await self._connect()
 
-    if msg:
-        return msg
-        
-    content=read_books()
-    id=int(get_max_id(content)) + 1
-    content[id]=book
-    
-    save_books(content)
+        async with self.queue.iterator() as iterator:
+            message: AbstractIncomingMessage
+            async for message in iterator:
+                try:
+                    async with message.process(requeue=False):
+                        assert message.reply_to is not None
 
-    return "Book was added"
-
-
-def check_book(book):
-    if book['author'].isdigit():
-        return "The name of author contains a digits!"
-
-    if not book['pages'].isdigit():
-        return "The pages contains a text!"
-
-    return ""
-
-
-def read_books():
-    import os
-
-    if os.path.isfile("books.json"):
-        with open('books.json', 'r') as f:
-            return json.loads(f.read())
-    
-    return {}
+                        content = message.body.decode()
+                        self._get_response(content=content)
+                except Exception as e:
+                    logger.error(e)
 
 
-def get_max_id(content):
-    if content:
-        return max(content.keys())
+async def main() -> None:
+    print(' [x] Ожидание запросов.')
+    RpcServer().run_until_complete()
 
-    return 0
-
-
-def save_books(content):
-    with open('books.json', 'wt') as f:
-        f.write(json.dumps(content))
-
-
-start_server()
+if __name__ == "__main__":
+    asyncio.run(main())
