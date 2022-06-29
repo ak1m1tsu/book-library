@@ -1,3 +1,7 @@
+import hashlib
+
+from uuid import uuid4
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -5,28 +9,32 @@ from sqlalchemy import (
     ForeignKey,
     create_engine
 )
-from sqlalchemy.orm import relationship, backref, Session
+from sqlalchemy.orm import relationship, Session
 from sqlalchemy.ext.declarative import declarative_base
-import hashlib
+from sqlalchemy.dialects.postgresql import UUID
 
 
 def make_db():
-    engine = create_engine('sqlite:///server.db')
+    engine = create_engine('postgresql+psycopg2://postgres:postgres@localhost:5432/rabbitmq')
     Base = declarative_base()
 
     class User(Base):
         __tablename__ = 'users'
-        id = Column(Integer, autoincrement=True, primary_key=True)
+        id = Column(UUID(as_uuid=True), primary_key=True)
         name = Column(String(100), index=True, unique=True, nullable=False)
         password = Column(String(1024), nullable=False)
 
         # relationship
         role_id = Column(Integer, ForeignKey('roles.id'))
-        role = relationship('Role', lazy='subquery', backref=backref('users', lazy=True))
+        role = relationship('Role', lazy='subquery')
 
         def __init__(self, name: str, password: str) -> None:
+            self.id = uuid4()
             self.name = name
             self.password = password
+
+    def __repr__(self) -> str:
+        return f'<User {self.id} {self.name}>'
     
     class Role(Base):
         __tablename__ = 'roles'
@@ -38,6 +46,21 @@ def make_db():
 
         def __repr__(self) -> str:
             return f'<Role {self.id} {self.name}>'
+    
+    class Book(Base):
+        __tablename__ = 'books'
+        id = Column(Integer, autoincrement=True, primary_key=True)
+        name = Column(String(100), nullable=False)
+        author = Column(String(100), nullable=False)
+        pages = Column(Integer, nullable=False)
+
+        def __init__(self, name: str, author: str, pages: int):
+            self.name = name
+            self.author = author
+            self.pages = pages
+
+        def __repr__(self) -> str:
+            return f'<Book {self.id}>'
     try:
         admin_role = Role('admin')
         user_role = Role('user')

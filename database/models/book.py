@@ -13,7 +13,7 @@ class Book(Base):
     author = Column(String(100), nullable=False)
     pages = Column(Integer, nullable=False)
 
-    def __init__(self, name: str, author: str, pages: int) -> None:
+    def __init__(self, name: str, author: str, pages: int):
         self.name = name
         self.author = author
         self.pages = pages

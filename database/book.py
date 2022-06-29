@@ -1,12 +1,13 @@
-from exceptions import NotFoundError, AlreadyExistsError
+from sqlalchemy.orm import Session
 
-from . import BaseSystem
-from .models.book import Book
+from . import BaseSystem, session
+from .models import Book
+from exceptions import NotFoundError, AlreadyExistsError
 
 
 class BookSystem(BaseSystem):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, session: Session) -> None:
+        super().__init__(session=session)
 
     def get_all(self) -> list:
         books = self._session.query(Book) \
@@ -29,7 +30,7 @@ class BookSystem(BaseSystem):
 
     def find_by_name(self, name: str) -> list:
         books = self._session.query(Book) \
-                             .filter(Book.name.ilike(name)) \
+                             .filter(Book.name.ilike(f'%{name}%')) \
                              .all()
 
         if not books:
@@ -39,7 +40,7 @@ class BookSystem(BaseSystem):
 
     def find_by_author(self, author: str) -> list:
         books = self._session.query(Book) \
-                             .filter(Book.author.ilike(author)) \
+                             .filter(Book.author.ilike(f'%{author}%')) \
                              .all()
 
         if not books:
@@ -55,38 +56,34 @@ class BookSystem(BaseSystem):
         if book:
             raise AlreadyExistsError(book)
 
-        with self._session as session:
-            session.begin()
-            try:
-                book = Book(name, author, pages)
-                session.add(book)
-            except Exception:
-                session.rollback()
-                return -1
-            else:
-                session.commit()
+        try:
+            book = Book(name, author, pages)
+            self._session.add(book)
+        except Exception:
+            self._session.rollback()
+            return -1
+        else:
+            self._session.commit()
 
         return 0
 
     def delete(self, id: int) -> int:
         book = self._session.query(Book) \
-                            .filter_by(id=id) \
+                            .filter_by(id = id) \
                             .first()
 
         if not book:
             raise NotFoundError(book)
 
-        with self._session as session:
-            session.begin()
-            try:
-                session.delete(book)
-            except Exception:
-                session.rollback()
-                return -1
-            else:
-                session.commit()
+        try:
+            self._session.delete(book)
+        except Exception:
+            self._session.rollback()
+            return -1
+        else:
+            self._session.commit()
 
         return 0
 
 
-book_system = BookSystem()
+book_system = BookSystem(session)

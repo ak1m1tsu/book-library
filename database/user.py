@@ -1,12 +1,13 @@
-from exceptions import NotFoundError, AlreadyExistsError
+from sqlalchemy.orm import Session
 
-from . import BaseSystem
-from .models.user import User
+from . import BaseSystem, session
+from .models import User
+from exceptions import NotFoundError, AlreadyExistsError
 
 
 class UserSystem(BaseSystem):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, session: Session) -> None:
+        super().__init__(session=session)
 
     def get_by_name(self, name: str) -> User:
         user = self._session.query(User) \
@@ -60,4 +61,4 @@ class UserSystem(BaseSystem):
         return 0
 
 
-user_system = UserSystem()
+user_system = UserSystem(session=session)
