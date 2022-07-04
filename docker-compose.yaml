@@ -1,8 +1,8 @@
 version: '3'
 
 services:
-  server:
-    container_name: 'server'
+  rpc:
+    container_name: 'rpc-serv'
     build: .
     command: python server.py
     env_file:

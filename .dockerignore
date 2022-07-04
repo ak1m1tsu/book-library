@@ -1,4 +1,4 @@
-logs/*
+logs/*.zip
 env
 .docker
 *__pycache__/
