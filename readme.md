@@ -1,40 +1,69 @@
-# rpc-demo
+# async-rabbitmq-py
 
 ## Как запустить?
 
 ---
 
-Настройка виртуального окружения
+Создаем файлы с переменными окружения для контейнеров в докере
 
 ```bash
-$ python3 -m virtualenv env
-$ . env/bin/activate
-(env) $ pip install -r requirements.txt
+$ touch .env .env.db .env.mq
 ```
 
-Создание БД
+Заполняем содержимым
+
+```py
+# .env
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/rabbitmq
+RABBITMQ_DEFAULT_USER=user
+RABBITMQ_DEFAULT_PASS=user
+```
+
+```py
+# .env.db
+POSTGRES_DB=rabbitmq
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+```
+
+```py
+# env.mq
+RABBITMQ_DEFAULT_USER=user
+RABBITMQ_DEFAULT_PASS=user
+```
+
+Запускаем + билдим докер файлы
 
 ```bash
-(env) $ python ./database/migrations/__make_db__.py
-(env) $ python ./database/migrations/__seed_data__.py
+$ docker compose up -d --build
+# или
+$ docker-compose up -d --build
 ```
 
-Запуск сервера
+Создаем бд и добавляем туда данные
 
 ```bash
-(env) $ python server.py
+$ docker compose exec rpc python database/migrations/__make_db__.py
+$ docker compose exec rpc python database/migrations/__seed_data__.py
+# или
+$ docker-compose exec rpc python database/migrations/__make_db__.py
+$ docker-compose exec rpc python database/migrations/__seed_data__.py
 ```
 
-Запуск клиента
+## Подключаемся в качестве клиента
+
+---
+
+Данные для входа по умолчанию, если вы добавляли данные в бд при помощи скрипта
+
+> Имя пользователя: **admin**
+> Пароль: **admin**
 
 ```bash
-(env) $ python client.py
+$ docker compose exec rpc python client.py
+# или
+$ docker-compose exec rpc python client.py
 ```
-
-> Для того чтобы клиент подключился нужно ввести имя пользователя и пароль.  
-> Админ:  
-> Login: **admin**  
-> Password: **admin**
 
 ## Что реализованно?
 
