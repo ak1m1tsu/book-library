@@ -15,7 +15,7 @@ from aio_pika.abc import (
     AbstractQueue
 )
 
-from config import COMMAND_COUNT, BOOK_HEADERS
+from config import COMMAND_COUNT, BOOK_HEADERS, RABBITMQ_DEFAULT_PASS, RABBITMQ_DEFAULT_USER
 from exceptions import NotFoundError
 from database.models.user import User
 from database.user import user_system
@@ -37,7 +37,7 @@ class RpcClient(object):
     async def connect(self) -> tuple["RpcClient", str]:
         try:
             self.connection = await connect(
-                url="amqp://admin:admin@localhost/",
+                url=f"amqp://{RABBITMQ_DEFAULT_USER}:{RABBITMQ_DEFAULT_PASS}@rabbitmq3/",
                 loop=self.loop,
             )
         except Exception:
@@ -144,7 +144,7 @@ async def main() -> None:
                     message['command'] = 'find_by_name'
                     message['object'] = get_book_name()
                 case 4:
-                    message['command'] = 'del'
+                    message['command'] = 'delete'
                     message['object'] = get_book_id()
                 case 5:
                     message['command'] = 'bye'
@@ -245,7 +245,7 @@ def get_book_id():
         id = input(" [•] Введите ID книги: ")
 
         if id.isdigit():
-            return id
+            return int(id)
 
         print(" [e] Номер должен содержать только цифры!")
 

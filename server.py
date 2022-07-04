@@ -17,6 +17,7 @@ from database.book import book_system
 from exceptions import AlreadyExistsError, NotFoundError
 from logger import logger
 from utils import AlchemyEncoder
+from config import RABBITMQ_DEFAULT_USER, RABBITMQ_DEFAULT_PASS
 
 
 class RpcServer(object):
@@ -36,7 +37,7 @@ class RpcServer(object):
     async def _connect(self) -> None:
         '''Подключение к localhost'''
         self._connection = Connection(
-            "amqp://server:test@localhost/",
+            f"amqp://{RABBITMQ_DEFAULT_USER}:{RABBITMQ_DEFAULT_PASS}@rabbitmq3/",
             loop=self._loop
         )
         await self._connection.connect()
@@ -131,32 +132,32 @@ class RpcServer(object):
                 'message' : 'Что-то пошло не так...'
             }
 
-    def _find_book_by_name(self, content: dict) -> dict:
+    def _find_book_by_name(self, name: str) -> dict:
         try:
-            books = book_system.find_by_name(author=content['object'])
+            books = book_system.find_by_name(name=name)
             return {
-                'command' : 'reder_books',
+                'command' : 'render_books',
                 'message' : books
             }
         except NotFoundError as e:
             logger.error(e)
             return {
                 'command' : 'error',
-                'message' : f'Совпадения по {content["object"]!r} не найдены.'
+                'message' : f'Совпадения по {name!r} не найдены.'
             }
 
-    def _find_book_by_author(self, content: dict) -> dict:
+    def _find_book_by_author(self, author: str) -> dict:
         try:
-            books = book_system.find_by_author(author=content['object'])
+            books = book_system.find_by_author(author=author)
             return {
-                'command' : 'reder_books',
+                'command' : 'render_books',
                 'message' : books
             }
         except NotFoundError as e:
             logger.error(e)
             return {
                 'command' : 'error',
-                'message' : f'Совпадения по {content["object"]!r} не найдены.'
+                'message' : f'Совпадения по {author!r} не найдены.'
             }
 
     async def _append_client(self, client: dict):

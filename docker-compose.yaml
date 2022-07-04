@@ -1,0 +1,31 @@
+version: '3'
+
+services:
+  server:
+    container_name: 'server'
+    build: .
+    command: python server.py
+    env_file:
+      - .env
+    volumes:
+      - ./:/code
+  db:
+    container_name: 'database'
+    image: postgres:latest
+    env_file:
+      - .env.db
+    volumes:
+      - postgres_data:/var/lib/postgres/data/
+    ports:
+      - 5432:5432
+  rabbitmq3:
+    container_name: 'rabbitmq'
+    image: rabbitmq:3-management
+    env_file:
+      - .env.mq
+    ports:
+      - 5672:5672
+      - 15672:15672
+
+volumes:
+  postgres_data:

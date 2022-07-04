@@ -1,4 +1,5 @@
 import hashlib
+import os
 
 from uuid import uuid4
 
@@ -14,8 +15,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import UUID
 
 
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+
 def make_db():
-    engine = create_engine('postgresql+psycopg2://postgres:postgres@localhost:5432/rabbitmq')
+    engine = create_engine(DATABASE_URL)
     Base = declarative_base()
 
     class User(Base):
